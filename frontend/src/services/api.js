@@ -1,5 +1,5 @@
 // src/services/api.js
-const API_DOMAIN = 'https://testapi.thinhuit.id.vn';
+const API_DOMAIN = 'https://api.thinhuit.id.vn';
 
 async function fetchData(endpoint, method = 'GET', body = null) {
   const url = `${API_DOMAIN}${endpoint}`;

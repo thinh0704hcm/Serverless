@@ -1,25 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Form, Card, Alert, Row, Col } from "react-bootstrap";
-import { useForm } from "react-hook-form";
+import { Button, Form, Card, Row, Col } from "react-bootstrap";
+import { useForm, useWatch } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
+import { Typeahead } from 'react-bootstrap-typeahead';
+import "react-bootstrap-typeahead/css/Typeahead.css";
+import "react-bootstrap-typeahead/css/Typeahead.bs5.css";
 import { getAllDaily, createPhieuThu } from '../services/api';
 import { DaiLySelectionModal } from './DaiLySelectionModal';
 import { MoneyInput } from './MoneyInput';
-import { formatMoney, parseMoney } from '../utils/formatters';
+import { formatMoney } from '../utils/formatters';
 
 export const LapPhieuThuTien = () => {
-  const { register, handleSubmit, setValue, reset, clearErrors, formState: { errors } } = useForm();
+  const { register, handleSubmit, setValue, reset, clearErrors, formState: { errors }, control } = useForm();
   const navigate = useNavigate();
-
-  const [formData, setFormData] = useState({
-    tenDaiLy: '',
-    noCuaDaiLy: '',
-    dienThoai: '',
-    email: '',
-    diaChi: '',
-    ngayThuTien: new Date().toISOString().split("T")[0],
-    soTienThu: ''
-  });
 
   const [daiLyList, setDaiLyList] = useState([]);
   const [successMessage, setSuccessMessage] = useState('');
@@ -29,9 +22,24 @@ export const LapPhieuThuTien = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [showError, setShowError] = useState(false);
   const [showDaiLyModal, setShowDaiLyModal] = useState(false);
-  const [selectedDaiLy, setSelectedDaiLy] = useState(null);
+  const [selectedDaiLyForForm, setSelectedDaiLyForForm] = useState([]);
   const [soTienThuFormatted, setSoTienThuFormatted] = useState('0');
   const [soTienThuRaw, setSoTienThuRaw] = useState(0);
+  const [noCuaDaiLyFormatted, setNoCuaDaiLyFormatted] = useState('0');
+
+  // Watch for form value changes
+  const watchedNoCuaDaiLy = useWatch({
+    control,
+    name: "noCuaDaiLy",
+    defaultValue: '0'
+  });
+
+  // Update formatted display when form value changes
+  useEffect(() => {
+    if (watchedNoCuaDaiLy) {
+      setNoCuaDaiLyFormatted(watchedNoCuaDaiLy);
+    }
+  }, [watchedNoCuaDaiLy]);
 
   useEffect(() => {
     fetchDaiLyList();
@@ -46,17 +54,10 @@ export const LapPhieuThuTien = () => {
     }
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleDaiLyChange = (e) => {
-    const selectedMaDaiLy = e.target.value;
+  const handleDaiLyChange = (selected) => {
+    const selectedMaDaiLy = selected.length > 0 ? selected[0].madaily : '';
     setValue("tenDaiLy", selectedMaDaiLy);
+    setSelectedDaiLyForForm(selected);
 
     // Clear validation error for agent selection
     clearErrors("tenDaiLy");
@@ -79,7 +80,9 @@ export const LapPhieuThuTien = () => {
       const selectedAgent = daiLyList.find(agent => agent.madaily === maDaiLy);
 
       if (selectedAgent) {
-        setValue("noCuaDaiLy", formatMoney(selectedAgent.congno || '0'));
+        const formattedDebt = formatMoney(selectedAgent.congno || '0');
+        setValue("noCuaDaiLy", formattedDebt);
+        setNoCuaDaiLyFormatted(formattedDebt);
         setValue("dienThoai", selectedAgent.sodienthoai || '');
         setValue("email", selectedAgent.email || '');
         setValue("diaChi", selectedAgent.diachi || '');
@@ -89,16 +92,10 @@ export const LapPhieuThuTien = () => {
     }
   };
 
-  const handleSoTienThuChange = (e) => {
-    const inputValue = e.target.value;
-    // Remove non-digits
-    const cleanValue = inputValue.replace(/[^\d]/g, '');
-    const numValue = parseInt(cleanValue) || 0;
-    const formattedValue = formatMoney(numValue);
-    
+  const handleSoTienThuChange = (formattedValue, rawValue) => {
     setSoTienThuFormatted(formattedValue);
-    setSoTienThuRaw(numValue);
-    setValue("soTienThu", numValue); // Store raw value for form submission
+    setSoTienThuRaw(rawValue);
+    setValue("soTienThu", rawValue); // Store raw value for form submission
   };
 
   const submitHandler = async (data) => {
@@ -150,8 +147,11 @@ export const LapPhieuThuTien = () => {
   const handleThoat = () => {
     // Clear form or navigate back
     reset();
+    setValue("ngayThuTien", new Date().toISOString().split("T")[0]);
     setSoTienThuFormatted('0');
     setSoTienThuRaw(0);
+    setNoCuaDaiLyFormatted('0');
+    setSelectedDaiLyForForm([]);
   };
 
   const handleExitToHome = () => {
@@ -159,9 +159,11 @@ export const LapPhieuThuTien = () => {
   };
 
   const handleDaiLySelect = (daiLy) => {
-    setSelectedDaiLy(daiLy);
     setValue("tenDaiLy", daiLy.madaily);
-    setValue("noCuaDaiLy", formatMoney(daiLy.congno || '0'));
+    setSelectedDaiLyForForm([daiLy]);
+    const formattedDebt = formatMoney(daiLy.congno || '0');
+    setValue("noCuaDaiLy", formattedDebt);
+    setNoCuaDaiLyFormatted(formattedDebt);
     setValue("dienThoai", daiLy.sodienthoai || daiLy.dienthoai || '');
     setValue("email", daiLy.email || '');
     setValue("diaChi", daiLy.diachi || '');
@@ -238,32 +240,24 @@ export const LapPhieuThuTien = () => {
                     <Col>
                       <Form.Group>
                         <Form.Label className="fw-medium mb-2">Tên đại lý</Form.Label>
-                        <Form.Select
-                          {...register("tenDaiLy", { required: "Vui lòng chọn đại lý" })}
+                        <Typeahead
+                          id="daily-typeahead"
+                          labelKey={(option) => `${option.madaily} - ${option.tendaily}`}
+                          options={daiLyList}
+                          placeholder="Chọn đại lý"
+                          clearButton
+                          selected={selectedDaiLyForForm}
                           onChange={handleDaiLyChange}
-                        >
-                          <option value="">-- Chọn đại lý --</option>
-                          {daiLyList && daiLyList.map((daiLy) => (
-                            <option key={daiLy.madaily} value={daiLy.madaily}>
-                              {daiLy.tendaily}
-                            </option>
-                          ))}
-                          {selectedDaiLy && (
-                            <option value={selectedDaiLy.madaily} selected>
-                              {selectedDaiLy.tendaily}
-                            </option>
-                          )}
-                        </Form.Select>
+                        />
                         {errors.tenDaiLy && <div className="text-danger small mt-1">{errors.tenDaiLy.message}</div>}
                       </Form.Group>
                     </Col>
                     <Col>
                       <Form.Group>
                         <Form.Label className="fw-medium mb-2">Nợ của đại lý</Form.Label>
-                        <Form.Control
-                          type="text"
-                          {...register("noCuaDaiLy")}
-                          readOnly
+                        <MoneyInput
+                          value={noCuaDaiLyFormatted}
+                          readOnly={true}
                           placeholder="Nợ hiện tại"
                         />
                       </Form.Group>
@@ -326,11 +320,11 @@ export const LapPhieuThuTien = () => {
                     <Col>
                       <Form.Group>
                         <Form.Label className="fw-medium mb-2">Số tiền thu</Form.Label>
-                        <Form.Control
-                          type="text"
+                        <MoneyInput
                           value={soTienThuFormatted}
                           onChange={handleSoTienThuChange}
                           placeholder="Nhập số tiền thu"
+                          readOnly={false}
                         />
                         {/* Hidden field for validation */}
                         <input 

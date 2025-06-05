@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { Button, Form, Card, Alert, Row, Col } from "react-bootstrap";
+import React, { useState, useEffect, useCallback } from 'react';
+import { Button, Form, Card, Row, Col } from "react-bootstrap";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
+import { Typeahead } from 'react-bootstrap-typeahead';
+import "react-bootstrap-typeahead/css/Typeahead.css";
+import "react-bootstrap-typeahead/css/Typeahead.bs5.css";
 import { getAllDaily, createPhieuXuat, getAllMatHang, getAllPhieuXuat } from '../services/api';
 import { DaiLySelectionModal } from './DaiLySelectionModal';
 import { DataTable } from './DataTable';
-import { formatMoney, parseMoney } from '../utils/formatters';
+import { formatMoney } from '../utils/formatters';
 import { MoneyInput } from './MoneyInput';
 
 export const LapPhieuXuatHang = () => {
-  const { register, handleSubmit, setValue, reset, clearErrors, formState: { errors } } = useForm();
+  const { register, handleSubmit, setValue, reset, clearErrors, formState: { errors }, watch } = useForm();
   const navigate = useNavigate();
 
   const getCurrentDate = () => {
@@ -32,7 +35,7 @@ export const LapPhieuXuatHang = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [showError, setShowError] = useState(false);
   const [showDaiLyModal, setShowDaiLyModal] = useState(false);
-  const [selectedDaiLy, setSelectedDaiLy] = useState(null);
+  const [selectedDaiLyForForm, setSelectedDaiLyForForm] = useState([]);
 
   const fetchDaiLyList = async () => {
     try {
@@ -52,7 +55,7 @@ export const LapPhieuXuatHang = () => {
     }
   };
 
-  const generateMaPhieuXuat = async () => {
+  const generateMaPhieuXuat = useCallback(async () => {
     try {
       const phieuXuatList = await getAllPhieuXuat();
       console.log('Current phieu xuat list:', phieuXuatList);
@@ -72,19 +75,23 @@ export const LapPhieuXuatHang = () => {
       // Fallback to manual input if API fails
       setValue("maPhieuXuat", "");
     }
-  };
+  }, [setValue]);
 
-  const handleDaiLyChange = (e) => {
-    const selectedMaDaiLy = e.target.value;
+  const handleDaiLyChange = (selected) => {
+    const selectedMaDaiLy = selected.length > 0 ? selected[0].madaily : '';
     setValue("tenDaiLy", selectedMaDaiLy);
+    setSelectedDaiLyForForm(selected);
 
     clearErrors("tenDaiLy");
 
     if (selectedMaDaiLy) {
       loadDaiLyInfo(selectedMaDaiLy);
     } else {
+      // Clear all agent-related fields when no selection
       setValue("noDaiLy", "");
       setValue("noToiDa", "");
+      setValue("noDaiLyRaw", 0);
+      setValue("noToiDaRaw", 0);
     }
   };
 
@@ -95,10 +102,10 @@ export const LapPhieuXuatHang = () => {
       if (selectedAgent) {
         const formattedNoDaiLy = formatMoney(selectedAgent.congno || '0');
         const formattedNoToiDa = formatMoney(selectedAgent.notoida || '0');
-        
+
         setValue("noDaiLy", formattedNoDaiLy);
         setValue("noToiDa", formattedNoToiDa);
-        
+
         // Also store raw values for calculations
         setValue("noDaiLyRaw", selectedAgent.congno || 0);
         setValue("noToiDaRaw", selectedAgent.notoida || 0);
@@ -113,7 +120,7 @@ export const LapPhieuXuatHang = () => {
     fetchMatHangList();
     generateMaPhieuXuat();
     setValue("ngayLap", getCurrentDate());
-  }, [setValue]);
+  }, [setValue, generateMaPhieuXuat]);
 
   const handleMatHangChange = (index, selectedMatHang) => {
     const selectedProduct = matHangList.find(mh => mh.mamathang === selectedMatHang);
@@ -340,6 +347,7 @@ export const LapPhieuXuatHang = () => {
     reset();
     setValue("ngayLap", getCurrentDate());
     generateMaPhieuXuat();
+    setSelectedDaiLyForForm([]);
     setChiTietPhieu([
       { stt: 1, tenMatHang: '', tenDonViTinh: '', soLuongTon: '', soLuongXuat: '', donGiaXuat: '', thanhTien: '' }
     ]);
@@ -350,19 +358,19 @@ export const LapPhieuXuatHang = () => {
   };
 
   const handleDaiLySelect = (daiLy) => {
-    setSelectedDaiLy(daiLy);
     setValue("tenDaiLy", daiLy.madaily);
-    
+    setSelectedDaiLyForForm([daiLy]);
+
     const formattedNoDaiLy = formatMoney(daiLy.congno || '0');
     const formattedNoToiDa = formatMoney(daiLy.notoida || '0');
-    
+
     setValue("noDaiLy", formattedNoDaiLy);
     setValue("noToiDa", formattedNoToiDa);
-    
+
     // Store raw values
     setValue("noDaiLyRaw", daiLy.congno || 0);
     setValue("noToiDaRaw", daiLy.notoida || 0);
-    
+
     setShowDaiLyModal(false);
     clearErrors("tenDaiLy");
   };
@@ -384,19 +392,31 @@ export const LapPhieuXuatHang = () => {
       accessor: 'tenMatHang',
       width: '23%',
       sortable: false,
-      render: (row, index) => (
-        <Form.Select
-          value={row.tenMatHang}
-          onChange={(e) => handleMatHangChange(index, e.target.value)}
-        >
-          <option value="">-- Chọn mặt hàng --</option>
-          {matHangList && matHangList.map((matHang) => (
-            <option key={matHang.mamathang} value={matHang.mamathang}>
-              {matHang.tenmathang}
-            </option>
-          ))}
-        </Form.Select>
-      )
+      render: (row, index) => {
+        // Filter out already selected products from other rows
+        const selectedProducts = chiTietPhieu
+          .map((item, i) => i !== index ? item.tenMatHang : null)
+          .filter(Boolean);
+
+        const availableOptions = matHangList.filter(mh =>
+          !selectedProducts.includes(mh.mamathang)
+        );
+
+        return (
+          <Typeahead
+            id={`mathang-typeahead-${index}`}
+            labelKey="tenmathang"
+            options={availableOptions}
+            placeholder="Chọn mặt hàng"
+            clearButton
+            selected={matHangList.filter(mh => mh.mamathang === row.tenMatHang)}
+            onChange={(selected) => {
+              const value = selected.length > 0 ? selected[0].mamathang : '';
+              handleMatHangChange(index, value);
+            }}
+          />
+        );
+      }
     },
     {
       header: 'Tên đơn vị tính',
@@ -459,11 +479,9 @@ export const LapPhieuXuatHang = () => {
       width: '15%',
       sortable: false,
       render: (row) => (
-        <Form.Control
-          type="text"
+        <MoneyInput
           value={row.thanhTien || '0'}
-          readOnly
-          className="text-end"
+          readOnly={true}
         />
       )
     },
@@ -485,24 +503,6 @@ export const LapPhieuXuatHang = () => {
       )
     }
   ];
-
-  const handleRefreshProducts = async () => {
-    try {
-      await fetchMatHangList();
-      setSuccessMessage('Danh sách mặt hàng đã được cập nhật');
-      setShowSuccess(true);
-      setTimeout(() => {
-        setShowSuccess(false);
-      }, 3000);
-    } catch (error) {
-      console.error('Error refreshing product list:', error);
-      setErrorMessage('Không thể cập nhật danh sách mặt hàng: ' + error.message);
-      setShowError(true);
-      setTimeout(() => {
-        setShowError(false);
-      }, 5000);
-    }
-  };
 
   return (
     <div className="container-fluid px-0 mt-4">
@@ -566,7 +566,7 @@ export const LapPhieuXuatHang = () => {
 
                   {/* Form fields in responsive rows */}
                   <Row className="g-3 mb-3">
-                    <Col>
+                    <Col sm="auto">
                       <Form.Group>
                         <Form.Label className="fw-medium mb-2">Mã phiếu xuất</Form.Label>
                         <Form.Control
@@ -582,33 +582,25 @@ export const LapPhieuXuatHang = () => {
                     <Col>
                       <Form.Group>
                         <Form.Label className="fw-medium mb-2">Tên đại lý</Form.Label>
-                        <Form.Select
-                          {...register("tenDaiLy", { required: "Vui lòng chọn đại lý" })}
+                        <Typeahead
+                          id="daily-typeahead"
+                          labelKey={(option) => `${option.madaily} - ${option.tendaily}`}
+                          options={daiLyList}
+                          placeholder="Chọn đại lý"
+                          clearButton
+                          selected={selectedDaiLyForForm}
                           onChange={handleDaiLyChange}
-                        >
-                          <option value="">-- Chọn đại lý --</option>
-                          {daiLyList && daiLyList.map((daiLy) => (
-                            <option key={daiLy.madaily} value={daiLy.madaily}>
-                              {daiLy.tendaily}
-                            </option>
-                          ))}
-                          {selectedDaiLy && (
-                            <option value={selectedDaiLy.madaily} selected>
-                              {selectedDaiLy.tendaily}
-                            </option>
-                          )}
-                        </Form.Select>
+                        />
                         {errors.tenDaiLy && <div className="text-danger small mt-1">{errors.tenDaiLy.message}</div>}
                       </Form.Group>
                     </Col>
 
-                    <Col>
+                    <Col sm={1}>
                       <Form.Group>
                         <Form.Label className="fw-medium mb-2">Nợ đại lý</Form.Label>
-                        <Form.Control
-                          type="text"
-                          {...register("noDaiLy")}
-                          readOnly
+                        <MoneyInput
+                          value={watch("noDaiLy") || '0'}
+                          readOnly={true}
                           placeholder="Nợ hiện tại"
                         />
                         {/* Hidden field for raw value */}
@@ -616,13 +608,12 @@ export const LapPhieuXuatHang = () => {
                       </Form.Group>
                     </Col>
 
-                    <Col>
+                    <Col sm="auto">
                       <Form.Group>
                         <Form.Label className="fw-medium mb-2">Nợ tối đa</Form.Label>
-                        <Form.Control
-                          type="text"
-                          {...register("noToiDa")}
-                          readOnly
+                        <MoneyInput
+                          value={watch("noToiDa") || '0'}
+                          readOnly={true}
                           placeholder="Nợ tối đa"
                         />
                         {/* Hidden field for raw value */}
@@ -630,7 +621,7 @@ export const LapPhieuXuatHang = () => {
                       </Form.Group>
                     </Col>
 
-                    <Col>
+                    <Col sm="auto">
                       <Form.Group>
                         <Form.Label className="fw-medium mb-2">Ngày lập</Form.Label>
                         <Form.Control
@@ -643,15 +634,13 @@ export const LapPhieuXuatHang = () => {
                       </Form.Group>
                     </Col>
 
-                    <Col>
+                    <Col sm="auto">
                       <Form.Group>
                         <Form.Label className="fw-medium mb-2">Tổng tiền</Form.Label>
-                        <Form.Control
-                          type="text"
-                          {...register("tongTien")}
-                          readOnly
+                        <MoneyInput
+                          value={watch("tongTien") || '0'}
+                          readOnly={true}
                           placeholder="0"
-                          className="text-end"
                         />
                         {/* Hidden field for raw value */}
                         <input type="hidden" {...register("tongTienRaw")} />
@@ -661,28 +650,30 @@ export const LapPhieuXuatHang = () => {
                 </div>
 
                 {/* Chi tiết mặt hàng */}
-                    <div className="bg-light rounded p-4 mb-4">
-                      <h6 className="text-primary fw-semibold mb-3 border-bottom border-primary pb-2">
-                        Danh sách mặt hàng
-                        </h6>
-                      <DataTable
-                        data={chiTietPhieu}
-                        columns={chiTietColumns}
-                        pageSize={20}
-                        searchable={false}
-                        sortable={false}
-                        bordered={true}
-                      />
-                      <div className="mt-3">
-                        <Button
-                          variant="success"
-                          size="sm"
-                          onClick={addRow}
-                        >
-                          ➕ Thêm dòng
-                        </Button>
-                      </div>
-                    </div>
+                <div className="bg-light rounded p-4 mb-4">
+                  <h6 className="text-primary fw-semibold mb-3 border-bottom border-primary pb-2">
+                    Danh sách mặt hàng
+                  </h6>
+                  <div style={{ overflow: 'visible' }}>
+                    <DataTable
+                      data={chiTietPhieu}
+                      columns={chiTietColumns}
+                      pageSize={20}
+                      searchable={false}
+                      sortable={false}
+                      bordered={true}
+                    />
+                  </div>
+                  <div className="mt-3">
+                    <Button
+                      variant="success"
+                      size="sm"
+                      onClick={addRow}
+                    >
+                      ➕ Thêm dòng
+                    </Button>
+                  </div>
+                </div>
 
                 <div className="d-flex flex-wrap gap-2 justify-content-center mt-4 pt-3 border-top">
                   <Button

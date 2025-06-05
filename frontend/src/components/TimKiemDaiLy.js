@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Form, Button, Card, Row, Col, Alert, Accordion } from 'react-bootstrap';
+import { Typeahead } from 'react-bootstrap-typeahead';
+import "react-bootstrap-typeahead/css/Typeahead.css";
+import "react-bootstrap-typeahead/css/Typeahead.bs5.css";
 import { useNavigate } from "react-router-dom";
 import {
     getAllLoaiDaiLy, getAllQuan, searchDaiLy,
@@ -227,13 +230,7 @@ export const TimKiemDaiLy = ({ isModal = false, onSelect = null, onClose = null 
 
     const handleSelectAgent = (agent) => {
         if (isModal) {
-            // In modal mode, immediately select and return
-            if (onSelect) {
-                onSelect(agent);
-            }
-            if (onClose) {
-                onClose();
-            }
+            setSelectedAgent(agent);
         }
     };
 
@@ -252,11 +249,6 @@ export const TimKiemDaiLy = ({ isModal = false, onSelect = null, onClose = null 
         } else {
             navigate("/");
         }
-    };
-
-    const formatCurrency = (amount) => {
-        if (!amount || amount === '0') return '0';
-        return new Intl.NumberFormat('vi-VN').format(amount);
     };
 
     const formatDate = (dateString) => {
@@ -321,7 +313,8 @@ export const TimKiemDaiLy = ({ isModal = false, onSelect = null, onClose = null 
         {
             header: 'Công nợ',
             accessor: 'congno',
-            width: '8%',
+            width: '12%',
+            cellClassName: 'text-end',
             render: (row) => formatMoney(row.congno)
         }
     ];
@@ -356,15 +349,6 @@ export const TimKiemDaiLy = ({ isModal = false, onSelect = null, onClose = null 
                     <Card className="shadow">
                         <Card.Header className="bg-primary text-white text-center py-3">
                             <h4 className="mb-0">🔍 {isModal ? 'Chọn đại lý' : 'Tìm kiếm đại lý'}</h4>
-                            {isModal && onClose && (
-                                <Button
-                                    variant="outline-light"
-                                    size="sm"
-                                    onClick={onClose}
-                                >
-                                    <i className="bi bi-x-lg"></i>
-                                </Button>
-                            )}
                         </Card.Header>
                         <Card.Body className="p-4">
                             {/* Search form content */}
@@ -438,33 +422,35 @@ export const TimKiemDaiLy = ({ isModal = false, onSelect = null, onClose = null 
                                                                 <Col>
                                                                     <Form.Group>
                                                                         <Form.Label className="fw-medium mb-2">Loại đại lý</Form.Label>
-                                                                        <Form.Select
-                                                                            value={searchCriteria.maloaidaily}
-                                                                            onChange={(e) => handleInputChange('maloaidaily', e.target.value)}
-                                                                        >
-                                                                            <option value="">Chọn loại đại lý</option>
-                                                                            {dsLoaiDaiLy.map((loai) => (
-                                                                                <option key={loai.maloaidaily} value={loai.maloaidaily}>
-                                                                                    {loai.tenloaidaily}
-                                                                                </option>
-                                                                            ))}
-                                                                        </Form.Select>
+                                                                        <Typeahead
+                                                                            id="loaidaily-typeahead"
+                                                                            labelKey="tenloaidaily"
+                                                                            options={dsLoaiDaiLy}
+                                                                            placeholder="Chọn loại đại lý"
+                                                                            clearButton
+                                                                            onChange={(selected) => {
+                                                                                const value = selected.length > 0 ? selected[0].maloaidaily : '';
+                                                                                handleInputChange('maloaidaily', value);
+                                                                            }}
+                                                                            selected={dsLoaiDaiLy.filter(item => item.maloaidaily === searchCriteria.maloaidaily)}
+                                                                        />
                                                                     </Form.Group>
                                                                 </Col>
                                                                 <Col>
                                                                     <Form.Group>
                                                                         <Form.Label className="fw-medium mb-2">Quận</Form.Label>
-                                                                        <Form.Select
-                                                                            value={searchCriteria.maquan}
-                                                                            onChange={(e) => handleInputChange('maquan', e.target.value)}
-                                                                        >
-                                                                            <option value="">Chọn quận</option>
-                                                                            {dsQuan.map((quan) => (
-                                                                                <option key={quan.maquan} value={quan.maquan}>
-                                                                                    {quan.tenquan}
-                                                                                </option>
-                                                                            ))}
-                                                                        </Form.Select>
+                                                                        <Typeahead
+                                                                            id="quan-typeahead"
+                                                                            labelKey="tenquan"
+                                                                            options={dsQuan}
+                                                                            placeholder="Chọn quận"
+                                                                            clearButton
+                                                                            onChange={(selected) => {
+                                                                                const value = selected.length > 0 ? selected[0].maquan : '';
+                                                                                handleInputChange('maquan', value);
+                                                                            }}
+                                                                            selected={dsQuan.filter(item => item.maquan === searchCriteria.maquan)}
+                                                                        />
                                                                     </Form.Group>
                                                                 </Col>
                                                             </Row>
@@ -611,34 +597,35 @@ export const TimKiemDaiLy = ({ isModal = false, onSelect = null, onClose = null 
                                                                 <Col>
                                                                     <Form.Group>
                                                                         <Form.Label className="fw-medium mb-2">Tên mặt hàng</Form.Label>
-                                                                        <Form.Select
-                                                                            value={searchCriteria.mamathang}
-                                                                            onChange={(e) => handleInputChange('mamathang', e.target.value)}
-                                                                        >
-                                                                            <option value="">Chọn mặt hàng</option>
-                                                                            {dsMatHang.map((mathang) => (
-                                                                                <option key={mathang.mamathang} value={mathang.mamathang}>
-                                                                                    {mathang.tenmathang}
-                                                                                </option>
-                                                                            ))}
-                                                                        </Form.Select>
+                                                                        <Typeahead
+                                                                            id="mathang-typeahead"
+                                                                            labelKey="tenmathang"
+                                                                            options={dsMatHang}
+                                                                            placeholder="Chọn mặt hàng"
+                                                                            clearButton
+                                                                            onChange={(selected) => {
+                                                                                const value = selected.length > 0 ? selected[0].mamathang : '';
+                                                                                handleInputChange('mamathang', value);
+                                                                            }}
+                                                                            selected={dsMatHang.filter(item => item.mamathang === searchCriteria.mamathang)}
+                                                                        />
                                                                     </Form.Group>
                                                                 </Col>
                                                                 <Col>
                                                                     <Form.Group>
                                                                         <Form.Label className="fw-medium mb-2">Đơn vị tính</Form.Label>
-                                                                        <Form.Select
-                                                                            value={searchCriteria.madonvitinh}
-                                                                            onChange={(e) => handleInputChange('madonvitinh', e.target.value)}
-                                                                        >
-                                                                            <option value="">Chọn đơn vị tính</option>
-                                                                            {dsDonViTinh.map((dvt) => (
-                                                                                <option key={dvt.madonvitinh} value={dvt.madonvitinh}>
-
-                                                                                    {dvt.tendonvitinh}
-                                                                                </option>
-                                                                            ))}
-                                                                        </Form.Select>
+                                                                        <Typeahead
+                                                                            id="donvitinh-typeahead"
+                                                                            labelKey="tendonvitinh"
+                                                                            options={dsDonViTinh}
+                                                                            placeholder="Chọn đơn vị tính"
+                                                                            clearButton
+                                                                            onChange={(selected) => {
+                                                                                const value = selected.length > 0 ? selected[0].madonvitinh : '';
+                                                                                handleInputChange('madonvitinh', value);
+                                                                            }}
+                                                                            selected={dsDonViTinh.filter(item => item.madonvitinh === searchCriteria.madonvitinh)}
+                                                                        />
                                                                     </Form.Group>
                                                                 </Col>
                                                             </Row>

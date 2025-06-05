@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { Button, Form, Card, Row, Col, Modal } from "react-bootstrap";
+import { Typeahead } from 'react-bootstrap-typeahead';
+import "react-bootstrap-typeahead/css/Typeahead.css";
+import "react-bootstrap-typeahead/css/Typeahead.bs5.css";
 import { useNavigate } from "react-router-dom";
 import {
     createDaily, getAllDaily, getAllLoaiDaiLy, getAllQuan,
@@ -9,6 +12,7 @@ import {
 import { Quan, LoaiDaiLy } from "../models";
 import { TimKiemDaiLy } from "./TimKiemDaiLy";
 import { DataTable } from "./DataTable";
+import { formatMoney} from '../utils/formatters';
 
 export const TiepNhanDaiLy = () => {
     // Form state
@@ -27,6 +31,8 @@ export const TiepNhanDaiLy = () => {
     const [infoMessage, setInfoMessage] = useState('');
     const [selectedDaily, setSelectedDaily] = useState(null);
     const [showSearchModal, setShowSearchModal] = useState(false);
+    const [selectedQuan, setSelectedQuan] = useState([]);
+    const [selectedLoaiDaiLy, setSelectedLoaiDaiLy] = useState([]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -98,8 +104,12 @@ export const TiepNhanDaiLy = () => {
                 new Date(selectedDaily.ngaytiepnhan).toISOString().split("T")[0] :
                 new Date().toISOString().split("T")[0]
             );
+
+            // Set TypeAhead selections
+            setSelectedQuan(dsQuan.filter(q => q.maquan === selectedDaily.maquan));
+            setSelectedLoaiDaiLy(dsLoaiDaiLy.filter(l => l.maloaidaily === selectedDaily.maloaidaily));
         }
-    }, [selectedDaily, setValue]);
+    }, [selectedDaily, setValue, dsQuan, dsLoaiDaiLy]);
 
     // Function to get the latest DaiLy ID
     const fetchLatestDaiLyId = async () => {
@@ -261,6 +271,8 @@ export const TiepNhanDaiLy = () => {
         setValue("maquan", "");
         setValue("maloaidaily", "");
         setValue("ngaytiepnhan", new Date().toISOString().split("T")[0]);
+        setSelectedQuan([]);
+        setSelectedLoaiDaiLy([]);
     }, [reset, setValue]);
 
     const getnewId = async () => {
@@ -307,13 +319,13 @@ export const TiepNhanDaiLy = () => {
         {
             header: 'Mã đại lý',
             accessor: 'madaily',
-            width: '8%',
+            width: '7%',
             cellClassName: 'fw-bold text-primary'
         },
         {
             header: 'Tên đại lý',
             accessor: 'tendaily',
-            width: '18%'
+            width: '16%'
         },
         {
             header: 'Số điện thoại',
@@ -324,31 +336,37 @@ export const TiepNhanDaiLy = () => {
         {
             header: 'Địa chỉ',
             accessor: 'diachi',
-            width: '20%'
+            width: '18%'
         },
         {
             header: 'Email',
             accessor: 'email',
-            width: '15%'
+            width: '12%'
         },
         {
             header: 'Loại đại lý',
             accessor: 'tenloaidaily',
-            width: '10%',
+            width: '8%',
             render: (row) => row.tenloaidaily || "N/A"
         },
         {
             header: 'Quận',
             accessor: 'tenquan',
-            width: '8%',
+            width: '6%',
             render: (row) => row.tenquan || "N/A"
         },
         {
             header: 'Ngày tiếp nhận',
             accessor: 'ngaytiepnhan',
-            width: '12%',
+            width: '10%',
             render: (row) => row.ngaytiepnhan ?
                 new Date(row.ngaytiepnhan).toLocaleDateString('vi-VN') : "N/A"
+        },
+        {
+            header: 'Công nợ',
+            accessor: 'congno',
+            width: '6%',
+            render: (row) => formatMoney(row.congno || 0)
         },
         {
             header: 'Thao tác',
@@ -462,34 +480,40 @@ export const TiepNhanDaiLy = () => {
                                         <Col>
                                             <Form.Group>
                                                 <Form.Label className="fw-medium mb-2">Quận/Huyện</Form.Label>
-                                                <Form.Select
+                                                <Typeahead
+                                                    id="quan-typeahead"
+                                                    labelKey="tenquan"
+                                                    options={dsQuan}
+                                                    placeholder="Chọn quận/huyện"
                                                     disabled={!isFormEnabled}
-                                                    {...register("maquan", { required: "Vui lòng chọn quận/huyện" })}
-                                                >
-                                                    <option value="">Chọn quận/huyện</option>
-                                                    {dsQuan.map(q => (
-                                                        <option key={q.maquan} value={q.maquan}>
-                                                            {q.tenquan}
-                                                        </option>
-                                                    ))}
-                                                </Form.Select>
+                                                    clearButton
+                                                    selected={selectedQuan}
+                                                    onChange={(selected) => {
+                                                        setSelectedQuan(selected);
+                                                        const value = selected.length > 0 ? selected[0].maquan : '';
+                                                        setValue("maquan", value);
+                                                    }}
+                                                />
                                                 {errors.maquan && <div className="text-danger small mt-1">{errors.maquan.message}</div>}
                                             </Form.Group>
                                         </Col>
                                         <Col>
                                             <Form.Group>
                                                 <Form.Label className="fw-medium mb-2">Loại đại lý</Form.Label>
-                                                <Form.Select
+                                                <Typeahead
+                                                    id="loaidaily-typeahead"
+                                                    labelKey="tenloaidaily"
+                                                    options={dsLoaiDaiLy}
+                                                    placeholder="Chọn loại đại lý"
                                                     disabled={!isFormEnabled}
-                                                    {...register("maloaidaily", { required: "Vui lòng chọn loại đại lý" })}
-                                                >
-                                                    <option value="">Chọn loại đại lý</option>
-                                                    {dsLoaiDaiLy.map(ldl => (
-                                                        <option key={ldl.maloaidaily} value={ldl.maloaidaily}>
-                                                            {ldl.tenloaidaily}
-                                                        </option>
-                                                    ))}
-                                                </Form.Select>
+                                                    clearButton
+                                                    selected={selectedLoaiDaiLy}
+                                                    onChange={(selected) => {
+                                                        setSelectedLoaiDaiLy(selected);
+                                                        const value = selected.length > 0 ? selected[0].maloaidaily : '';
+                                                        setValue("maloaidaily", value);
+                                                    }}
+                                                />
                                                 {errors.maloaidaily && <div className="text-danger small mt-1">{errors.maloaidaily.message}</div>}
                                             </Form.Group>
                                         </Col>
@@ -563,7 +587,7 @@ export const TiepNhanDaiLy = () => {
                                     >
                                         🆕 Đại lý mới
                                     </Button>
-                                                                        <Button
+                                    <Button
                                         type="button"
                                         variant="outline-primary"
                                         onClick={handleShowSearchModal}
@@ -601,17 +625,17 @@ export const TiepNhanDaiLy = () => {
                             <h5 className="mb-0 text-white">Danh sách đại lý</h5>
                         </Card.Header>
                         <Card.Body className="p-3">
-                                <DataTable
-                                    data={dsDaiLy}
-                                    columns={columns}
-                                    pageSize={10}
-                                    searchable={true}
-                                    sortable={true}
-                                    refreshable={true}
-                                    onRefresh={handleRefresh}
-                                    refreshButtonText="Làm mới dữ liệu"
-                                    refreshButtonIcon="bi bi-arrow-clockwise"
-                                />
+                            <DataTable
+                                data={dsDaiLy}
+                                columns={columns}
+                                pageSize={10}
+                                searchable={true}
+                                sortable={true}
+                                refreshable={true}
+                                onRefresh={handleRefresh}
+                                refreshButtonText="Làm mới dữ liệu"
+                                refreshButtonIcon="bi bi-arrow-clockwise"
+                            />
                         </Card.Body>
                     </Card>
                 </div>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Form } from 'react-bootstrap';
-import { formatMoney, parseMoney } from '../utils/formatters';
+import { formatMoney} from '../utils/formatters';
 
 export const MoneyInput = ({ 
   value, 
@@ -61,7 +61,7 @@ export const MoneyInput = ({
       onBlur={handleBlur}
       placeholder={placeholder}
       readOnly={readOnly}
-      className={`text-end ${className}`}
+      className={`${className}`}
       {...props}
     />
   );

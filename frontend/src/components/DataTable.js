@@ -168,12 +168,13 @@ export const DataTable = ({
             </Row>
 
             {/* Table */}
-            <div className={responsive ? 'table-responsive' : ''}>
+            <div className={responsive ? 'table-responsive' : ''} style={{ overflow: 'visible' }}>
                 <Table
                     striped={striped}
                     hover={hover}
                     bordered={bordered}
                     className={`mb-0 ${className}`}
+                    style={{ overflow: 'visible' }}
                 >
                     <thead className="table-light">
                         <tr>
