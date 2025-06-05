@@ -106,12 +106,6 @@ export const LapBaoCaoDoanhSo = () => {
     navigate("/");
   };
 
-  const handleRefreshReport = () => {
-    if (baoCaoData.length > 0) {
-      handleLapBaoCao(); // Re-run the report with current month/year
-    }
-  };
-
   // Define columns for báo cáo DataTable
   const baoCaoColumns = [
     {
